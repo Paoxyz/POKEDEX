@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokedex</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: #f0f2f5;
+      color: #2f3542;
+      display: flex;
+      flex-direction: row;
+    }
+
+    .sidebar {
+      width: 260px;
+      background-color: #ff6b81;
+      padding: 1.5rem;
+      height: 100vh;
+      overflow-y: auto;
+      color: white;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar h3 {
+      margin-top: 0;
+      font-size: 16px;
+      font-family: 'Press Start 2P', cursive;
+    }
+
+    .sidebar select,
+    .sidebar button {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 12px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+      border-radius: 8px;
+      border: none;
+      background-color: #ffa502;
+      color: white;
+      cursor: pointer;
+    }
+
+    .sidebar button:hover,
+    .sidebar select:hover {
+      background-color: #ffca57;
+    }
+
+    .main {
+      flex-grow: 1;
+      padding: 2rem;
+      background: #ffffff;
+      min-height: 100vh;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 14px;
+      font-size: 14px;
+      border: 2px solid #ced6e0;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #pokedex {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+
+    .card {
+      background-color: #fdfdfd;
+      border: 1px solid #e0e0e0;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      padding: 1.5rem;
+      transition: transform 0.2s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .card h2 {
+      font-size: 20px;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .sprites {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .sprites div {
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .sprites img {
+      width: 80px;
+      height: 80px;
+    }
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .stat-name {
+      width: 90px;
+      font-weight: bold;
+    }
+
+    .bar {
+      flex: 1;
+      height: 10px;
+      background-color: #dfe4ea;
+      border-radius: 8px;
+      margin-left: 8px;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      background-color: #70a1ff;
+    }
+
+    .locations {
+      font-size: 12px;
+      color: #57606f;
+      margin-top: 10px;
+    }
+
+    .load-more {
+      display: block;
+      margin: 3rem auto 1rem;
+      padding: 12px 24px;
+      background-color: #1e90ff;
+      color: white;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        box-shadow: none;
+      }
+
+      .main {
+        padding: 1rem;
+      }
+
+      .load-more {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h3>NAV</h3>
+    <select id="genSelect" onchange="loadGeneration(this.value)">
+      <option value="">All Generations</option>
+      <option value="1">Gen I</option>
+      <option value="2">Gen II</option>
+      <option value="3">Gen III</option>
+      <option value="4">Gen IV</option>
+      <option value="5">Gen V</option>
+      <option value="6">Gen VI</option>
+      <option value="7">Gen VII</option>
+      <option value="8">Gen VIII</option>
+    </select>
+    <button onclick="loadNextBatch()">Load Pokémon</button>
+  </div>
+
+  <div class="main">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search Pokémon by name..." onkeyup="filterPokemon()">
+    </div>
+    <div id="pokedex"></div>
+    <button class="load-more" onclick="loadNextBatch()">Load More</button>
+  </div>
+
+  <script>
+    let allCards = [];
+    let offset = 0;
+    const limit = 50;
+    let currentGenList = [];
+    let isGenFiltered = false;
+
+    async function fetchPokemon(name) {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name}`);
+      return res.json();
+    }
+
+    async function fetchLocations(url) {
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.length) return 'Unknown';
+        return data.map(loc => loc.location_area.name.replace(/-/g, ' ')).join(', ');
+      } catch {
+        return 'Unknown';
+      }
+    }
+
+    function renderStat(name, value) {
+      return `
+        <div class="stats-bar">
+          <div class="stat-name">${name}</div>
+          <div class="bar"><div class="fill" style="width: ${Math.min(100, value / 2)}%;"></div></div>
+        </div>
+      `;
+    }
+
+    async function addPokemonToDOM(name) {
+      const container = document.getElementById('pokedex');
+      try {
+        const data = await fetchPokemon(name);
+        const locationURL = data.location_area_encounters;
+        const locations = await fetchLocations(locationURL);
+        const types = data.types.map(t => t.type.name).join(', ');
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <h2>#${data.id} ${data.name}</h2>
+          <div class="sprites">
+            <div><img src="${data.sprites.front_default}" alt="Default"/><div>Default</div></div>
+            <div><img src="${data.sprites.front_female || data.sprites.front_default}" alt="Female"/><div>Female</div></div>
+            <div><img src="${data.sprites.front_shiny}" alt="Shiny"/><div>Shiny</div></div>
+            <div><img src="${data.sprites.front_shiny_female || data.sprites.front_shiny}" alt="Shiny Female"/><div>Shiny ♀</div></div>
+          </div>
+          <p>Type: ${types}</p>
+          <p class="locations">Location: ${locations}</p>
+          ${renderStat('HP', data.stats[0].base_stat)}
+          ${renderStat('Attack', data.stats[1].base_stat)}
+          ${renderStat('Defense', data.stats[2].base_stat)}
+          ${renderStat('Sp. Atk', data.stats[3].base_stat)}
+          ${renderStat('Sp. Def', data.stats[4].base_stat)}
+          ${renderStat('Speed', data.stats[5].base_stat)}
+        `;
+        card.setAttribute('data-name', data.name.toLowerCase());
+        allCards.push(card);
+        container.appendChild(card);
+      } catch {
+        console.warn('Failed to fetch:', name);
+      }
+    }
+
+    async function loadNextBatch() {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`);
+      const list = await res.json();
+      for (let entry of list.results) {
+        await addPokemonToDOM(entry.name);
+      }
+      offset += limit;
+    }
+
+    function filterPokemon() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const container = document.getElementById('pokedex');
+      container.innerHTML = '';
+      allCards.forEach(card => {
+        const name = card.getAttribute('data-name');
+        if (name.includes(query)) {
+          container.appendChild(card);
+        }
+      });
+    }
+
+    async function loadGeneration(gen) {
+      const container = document.getElementById('pokedex');
+      container.innerHTML = '';
+      allCards = [];
+
+      if (!gen) {
+        isGenFiltered = false;
+        offset = 0;
+        loadNextBatch();
+        return;
+      }
+
+      isGenFiltered = true;
+      const res = await fetch(`https://pokeapi.co/api/v2/generation/${gen}`);
+      const data = await res.json();
+      currentGenList = data.pokemon_species.map(p => p.name);
+      for (let name of currentGenList) {
+        await addPokemonToDOM(name);
+      }
+    }
+
+    loadNextBatch();
+  </script>
+</body>
+</html>
